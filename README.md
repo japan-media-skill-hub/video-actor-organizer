@@ -3,7 +3,7 @@
 该仓库用于发布 `video-actor-organizer` 技能的开源版本。
 
 - Skill 目录：`skills/video-actor-organizer`
-- 来源：`/home/base/javmanager/active_skills/video-actor-organizer`
+- 来源：本地技能库 `active_skills/video-actor-organizer`（已做公开化清理）
 
 ## Structure
 
