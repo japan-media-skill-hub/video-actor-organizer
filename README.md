@@ -70,22 +70,12 @@ VR 视频目标路径：
 - `JAV`：已整理主库（目标根）
 - `atmp`：未整理暂存区（扫描源）
 
-推荐用法：以 `JAV` 为目标根，整理 `atmp`。
+推荐方式：以 `JAV` 作为目标根，直接对 `atmp` 执行“先规划、再归位”的整理流程。
 
-```bash
-python skills/video-actor-organizer/scripts/plan_actor_classify.py \
-  --root "/path/to/JAV/atmp" \
-  --target-root "/path/to/JAV" \
-  --unknown-category "99" \
-  --japanese-category "0" \
-  --title-max-length 20 \
-  --width-threshold 2000 \
-  --big-dir "BIG" \
-  --output "plans/"
-
-python skills/video-actor-organizer/scripts/execute_plan.py \
-  --plan "plans/actor_classify_YYYYmmdd_HHMMSS.json"
-```
+该流程由 Agent 自动完成：
+- 先扫描 `atmp` 生成可审阅的归位计划
+- 再按计划将目录归位到 `JAV` 的演员索引体系
+- 对未映射演员暂缓归位并汇总，待映射后继续收敛
 
 这样做的意义：
 - 避免 `atmp/atmp` 之类嵌套污染
@@ -104,10 +94,10 @@ python skills/video-actor-organizer/scripts/execute_plan.py \
 
 ## 使用建议
 
-- 先 `plan` 再 `execute`，把移动变成“可预览、可回放”的过程
-- 新演员命名不统一时，优先维护 `memory/actor_mappings.toml`，避免后续分叉目录
-- 大量增量进入 `atmp` 时，按批次执行（计划→执行→复检）比一次性全库重整更稳
-- 默认不扫描已整理目录；只有在你明确要“全库再归架”时才开启 `--include-organized`
+- 保持“先规划、再执行”的两阶段整理，便于审阅与回溯
+- 新演员命名不统一时，优先维护映射记忆，避免后续分叉目录
+- 大量增量进入 `atmp` 时，按批次归位（计划→执行→复检）更稳
+- 默认跳过已整理目录；仅在明确需要全库重排时才启用“包含已整理目录”
 
 ## 仓库结构
 
