@@ -1,18 +1,122 @@
 # video-actor-organizer Skill
 
-该仓库用于发布 `video-actor-organizer` 技能的开源版本。
+本技能主要解决的问题是：**大量电影的分门别类存储问题**。既然我们处理的是 j-media，就采用更高效的方案：**按演员进行目录归类**。
 
-- Skill 目录：`skills/video-actor-organizer`
-- 来源：本地技能库 `active_skills/video-actor-organizer`（已做公开化清理）
+经过本技能处理后的 j-media 目录，直接可访问性会明显提升：
+- 可以被 Jellyfin 索引
+- 也适合手工浏览与探索（即使是 2000+ 电影库）
+- 能以非常快的速度定位到某个演员及其作品
+- 可以从目录层级直接看到作品的关键信息
 
-## Structure
+对于一个管理混乱的目录，本技能可以直接完成“整理归位”式处理。
+
+## 用图书馆来理解这个技能
+
+把你的媒体库想象成一个大型图书馆：
+
+- `JAV` 是主书架区（长期有序存放区）
+- `atmp` 是还书暂存区/新书暂存区（待整理区）
+- 本技能是“图书馆管理员”
+
+管理员做的事不是简单挪动文件，而是按“作者索引体系”归位。这里的“作者”对应“演员”。
+
+最终效果是：
+- 新进内容从 `atmp` 归位到 `JAV` 主书架
+- 已归位内容可按规则复核、重排
+- 目录结构稳定，后续维护成本显著下降
+
+## 实际功能（基于当前技能实现）
+
+技能目录：`skills/video-actor-organizer`
+
+核心脚本：
+- `skills/video-actor-organizer/scripts/plan_actor_classify.py`
+- `skills/video-actor-organizer/scripts/execute_plan.py`
+- `skills/video-actor-organizer/scripts/classifier.py`
+
+当前实现能力包含：
+
+1. 递归扫描视频目录，识别包含视频文件的叶子目录
+2. 解析 NFO 获取演员、标题、分辨率
+3. 自动识别 VR（宽度阈值 + 非 16:9）并分流到 `BIG/`
+4. 按演员分类生成移动计划（JSON），再按计划执行移动
+5. 支持“扫描目录”与“目标根目录”分离（`--root` + `--target-root`）
+6. 支持片假名演员中文映射记忆：
+   - 映射文件：`memory/actor_mappings.toml`
+   - 已映射：按中文映射名做拼音分类，目录名为 `中文名_原名`
+   - 未映射：先跳过并汇总给 Agent 处理
+7. 未知演员自动进入默认分类（如 `99`）
+8. 支持 `--include-organized` 对已整理目录做规则化重整（默认关闭）
+
+## 目录归位模型（图书馆书架级）
+
+普通视频目标路径：
+
+```text
+{target-root}/{category}/{首汉字或首字母}/{演员名}/{标题}/
+```
+
+VR 视频目标路径：
+
+```text
+{target-root}/BIG/{category}/{首汉字或首字母}/{演员名}/{标题}/
+```
+
+这相当于图书馆中的：总馆区 → 索引字母区 → 作者架 → 书名位。
+
+## 你最关心的典型场景：`JAV` + `atmp`
+
+假设：
+- `JAV`：已整理主库（目标根）
+- `atmp`：未整理暂存区（扫描源）
+
+推荐用法：以 `JAV` 为目标根，整理 `atmp`。
+
+```bash
+python skills/video-actor-organizer/scripts/plan_actor_classify.py \
+  --root "/path/to/JAV/atmp" \
+  --target-root "/path/to/JAV" \
+  --unknown-category "99" \
+  --japanese-category "0" \
+  --title-max-length 20 \
+  --width-threshold 2000 \
+  --big-dir "BIG" \
+  --output "plans/"
+
+python skills/video-actor-organizer/scripts/execute_plan.py \
+  --plan "plans/actor_classify_YYYYmmdd_HHMMSS.json"
+```
+
+这样做的意义：
+- 避免 `atmp/atmp` 之类嵌套污染
+- 新内容会直接“上架”到主库索引结构
+- 你手动浏览时体验接近图书馆找书：按演员快速定位
+
+如果你希望对主书架再规范一轮，可在明确需要时开启 `--include-organized`，进行“忽略已归类状态”的规则化重排。
+
+## 匿名化效果示例（来自真实使用记录）
+
+以下示例已做去隐私处理，仅保留可复用结论：
+
+- 场景 A：待整理区一次扫描 40 个视频目录，按演员归类执行 39 成功、1 失败，同时补全 3 个演员映射后可继续收敛
+- 场景 B：一次完整流水线中，待整理区先完成刮削与 NFO 修复，再执行按演员归类，26 个目录全部成功归位
+- 场景 C：归位后目录可直接按演员导航，配合媒体库索引与人工浏览都更高效，后续增量整理也更稳定
+
+## 使用建议
+
+- 先 `plan` 再 `execute`，把移动变成“可预览、可回放”的过程
+- 新演员命名不统一时，优先维护 `memory/actor_mappings.toml`，避免后续分叉目录
+- 大量增量进入 `atmp` 时，按批次执行（计划→执行→复检）比一次性全库重整更稳
+- 默认不扫描已整理目录；只有在你明确要“全库再归架”时才开启 `--include-organized`
+
+## 仓库结构
 
 ```text
 skills/
   video-actor-organizer/
+    SKILL.md
+    scripts/
+      classifier.py
+      plan_actor_classify.py
+      execute_plan.py
 ```
-
-## Notes
-
-- 本仓库初始化为公开仓库，后续由 `japan-media-skill-hub` 组织维护。
-- 详细使用说明会在后续 README 迭代中补充。
